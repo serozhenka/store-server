@@ -1,9 +1,11 @@
 from django.shortcuts import render, HttpResponseRedirect
 from django.urls import reverse
 from django.contrib import auth, messages
+from django.contrib.auth.decorators import login_required
 
 from users.forms import UserLoginForm, UserRegistrationForm, UserProfileForm
 from users.models import User
+from products.models import Basket
 
 def login(request):
     if request.method == 'GET':
@@ -61,20 +63,30 @@ def register(request):
             return render(request, 'users/register.html', context)
 
 
+@login_required
 def profile(request):
-    if request.method == "GET":
-        form = UserProfileForm(instance=request.user)
-        context = {
-            'form': form,
-        }
-
-        return render(request, 'users/profile.html', context)
-    else:
+    if request.method == "POST":
         form = UserProfileForm(data=request.POST, instance=request.user, files=request.FILES)
         if form.is_valid():
             form.save()
             return HttpResponseRedirect(reverse('users:profile'))
+    else:
+        form = UserProfileForm(instance=request.user)
+
+    baskets = Basket.objects.filter(user=request.user)
+    total_quantity = sum([basket.quantity for basket in baskets])
+    total_sum = sum([basket.sum() for basket in baskets])
+
+    context = {
+        'form': form,
+        'baskets': baskets,
+        'total_quantity': total_quantity,
+        'total_sum': total_sum,
+    }
+    return render(request, 'users/profile.html', context)
+
 
 def logout(request):
     auth.logout(request)
     return HttpResponseRedirect(reverse('index'))
+
